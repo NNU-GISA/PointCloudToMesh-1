@@ -1,0 +1,308 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>CS 184 Mesh Editor</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+</head>
+
+
+<body>
+
+<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2019</h1>
+<h1 align="middle">Project 2: Mesh Editor</h1>
+<h2 align="middle">Jessica Lee</h2>
+
+<br><br>
+
+<div>
+
+<h2 align="middle">Overview</h2>
+<p>In this project, I created a mesh editor using Bezier curves with de Casteljau's algorithm. I implemented functions to split and flip edges, and used them to upsample meshes with loop subdivision. The most difficult part of this project was debugging. I really enjoyed how I could visually see what I was coding, as well as how my mistakes/bugs were being visually represented. </p>
+
+<h2 align="middle">Section I: Bezier Curves and Surfaces</h2>
+
+<h3 align="middle">Part 1: Bezier curves with 1D de Casteljau subdivision</h3>
+<p>de Casteljau's algorithm uses a series of control points to create a smooth Bezier curve. From k+1 points, we can create a new set of k points by computing the linear interpolation between every two points. We can do this iteratively until we are left with a single point. I implemented deCasteljau's algorithm by implementing the iterative step: using the control points from the last evaluated level, find the intermediate control points by applying lerp on the x and y values for pairs of points, then adding the resultant points as a new evaluated level of control points. </p>
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="./img/part1(1).png" align="middle" width="300px"/>
+        <figcaption align="middle">6 control points</figcaption>
+      </td>
+      <td>
+        <img src="./img/part1(2).png" align="middle" width="300px"/>
+        <figcaption align="middle">First call to evaluate step</figcaption>
+      </td>
+      <td>
+        <img src="./img/part1(3).png" align="middle" width="300px"/>
+        <figcaption align="middle">Second call to evaluate step</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr>
+      <td>
+        <img src="./img/part1(4).png" align="middle" width="300px"/>
+        <figcaption align="middle">Third call to evaluate step</figcaption>
+      </td>
+      <td>
+        <img src="./img/part1(5).png" align="middle" width="300px"/>
+        <figcaption align="middle">Fourth call to evaluate step</figcaption>
+      </td>
+      <td>
+        <img src="./img/part1(6).png" align="middle" width="300px"/>
+        <figcaption align="middle">Fifth call to evaluate step</figcaption>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <img src="./img/part1(7).png" align="middle" width="300px"/>
+        <figcaption align="middle">Completed curve</figcaption>
+      </td>
+      <td>
+        <img src="./img/part1(8).png" align="middle" width="300px"/>
+        <figcaption align="middle">Modified t value</figcaption>
+      </td>
+      <td>
+        <img src="./img/part1(9).png" align="middle" width="300px"/>
+        <figcaption align="middle">Moved points around and modified t value</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<h3 align="middle">Part 2: Bezier surfaces with separable 1D de Casteljau subdivision</h3>
+<p>
+de Casteljau's algorithm can be applied to 2D surfaces as well. Given 4x4 control points, we can first apply deCasteljau's algorithm in one dimension to each 4x1 control points. Then the points on the corresponding curves on these 4 Bezier curves are the control points in 2D for the "moving" Bezuer curve. We can again apply deCasteljau's algorithm on them to evaluate the point on the "moving" curve. 
+</div>
+I implemented this in my program by creating a helper function that uses 1D de Casteljau's subdivision to find a point given four control points that lie on a single curve. I did this with two nested for loops. Then using this helper function, I evaluated point u in each of the 4 Bezier curves in u. Then I used the same helper function to evaluate point v on the "moving" Bezier curve from the resultant point u's. 
+<br><br>
+I struggled with finding a bug for converting polygons to half-edge mesh, since apparently at least one of the vertices was nonmanifold. It turned out this was happening because I wasn't clearing my vector of Vertex3D's that I was using to store intermediate control points, so I just made sure I cleared it after each loop. 
+</p>
+<center><img src="./img/teapot.png" align="middle" width="400px"/></center>
+<figcaption align="middle"> Teapot rendering. </figcaption>
+
+
+<h2 align="middle">Section II: Sampling</h2>
+
+<h3 align="middle">Part 3: Average normals for half-edge meshes</h3>
+<p>
+  I implemented the Vertex::normal function that computes the area-weighted average normal vector at a vertex v. To do this, I summed the cross product of each consecutive pair of adjacent edges incident with v, and then normalized the sum. To find the vectors to cross product, I first found the positions of vertices u and v for edge (u, v) and then subtracted the position of u from v to get the vector of edge (u, v). I had to make sure to compute the cross product using one inward pointing vector and one outward pointing vector, as opposed to two outward pointing vectors (which I did at first). This way the normal vector would be pointing in the right direction.
+</p>
+<div align = "middle">
+  <table style="width=100%">
+    <tr>
+        <td>
+          <img src="./img/part3(1).png" align="middle" width="400px"/>
+          <figcaption align="middle">Default OpenGL shading without smoothed normals</figcaption>
+        </td>
+        <td>
+          <img src="./img/part3(2).png" align="middle" width="400px"/>
+          <figcaption align="middle">Default OpenGL shading with smoothed normals</figcaption>
+        </td>
+    </tr>
+  </table>
+</div>
+
+<h3 align="middle">Part 4: Half-edge flip</h3>
+<p>
+  I first drew a diagram of the neighborhood before and after an edge flip, labeling all the half-edges, edges, faces, and vertices. Then I collected all the elements from the "before" diagram and reassigned them according to my "after" diagram, making sure that I set all pointers inside every half-edge. One bug I had was not realizing I set h7->next() = h6->next() instead of h7->next() = h7->next(). It caused my program to load forever when I flipped an edge. When I rewrote my code using the setNeighbors helper, I caught my mistake and everything worked properly after fixing it :). 
+</p>
+<div align = "middle">
+  <table style="width=100%">
+    <tr>
+        <td>
+          <img src="./img/part4(1).png" align="middle" width="350px"/>
+          <figcaption align="middle">Original mesh before flipping edges</figcaption>
+        </td>
+        <td>
+          <img src="./img/part4(2).png" align="middle" width="350px"/>
+          <figcaption align="middle">After flipping edges</figcaption>
+        </td>
+        <td>
+          <img src="./img/part4(3).png" align="middle" width="350px"/>
+          <figcaption align="middle">Flipped some more edges</figcaption>
+        </td>
+    </tr>
+  </table>
+</div>
+
+<h3 align="middle">Part 5: Half-edge split</h3>
+<p>
+  I implemented the half-edge split operation by once again drawing diagrams of a neighborhood before and after an edge split. I collected all the elements based on the "before" diagram, then allocated new elements and reassigned/assigned elements based on the "after" diagram. More specifically, I created a new vertex (amongst a bunch of other new elements) and set its position to be the average of two opposing vertices. An interesting debugging trick I used was to use the cube to debug since it has the simplest mesh. When I applied an edge split, I could see precisely what vertices the edges were connected to, which was really helpful when I was reassigning an edge's corresponding verex incorrectly. Additionally, at first I had moved one of the original vertices to become the midpoint vertex and created another vertex to replace where the original vertex used to be; however, I soon realized when trying to split edges on the cube that I should create a new vertex at the midpoint and not change the original vertices' positions. This solved all my bugs.
+</p>
+<div align = "middle">
+  <table style="width=100%">
+    <tr>
+        <td>
+          <img src="./img/part5(1).png" align="middle" width="350px"/>
+          <figcaption align="middle">Original mesh before splitting or flipping edges</figcaption>
+        </td>
+        <td>
+          <img src="./img/part5(2).png" align="middle" width="350px"/>
+          <figcaption align="middle">After splitting edges</figcaption>
+        </td>
+        <td>
+          <img src="./img/part5(3).png" align="middle" width="350px"/>
+          <figcaption align="middle">After a combination of edge splits and flips</figcaption>
+        </td>
+    </tr>
+  </table>
+</div>
+
+
+<h3 align="middle">Part 6: Loop subdivision for mesh upsampling</h3>
+<p>I implemented loop subdivision by splitting every edge in the mesh and flipping any newly created edges that connected an old vertex with a new vertex. I also calculated the new positions of every old and new vertex. I used the newPosition field to temporarily store them, and flagged whether or not edges/vertices were new with the isNew field. One debugging trick I was used was to comment out parts of my code to isolate where the issue was occuring. It turned out my split function had some bugs, and I wasn't assigning the proper position to the new vertices.</p>
+
+<p>
+  I noticed after loop subdivision, sharp corners and edges became rounder/smoother. This is demonstrated in the following photos of increased upsampling:
+</p>
+
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="./img/part6(11).png" align="middle" width="400px"/>
+      </td>
+      <td>
+        <img src="./img/part6(12).png" align="middle" width="400px"/>
+      </td>
+    </tr>
+    <br>
+    <tr>
+      <td>
+        <img src="./img/part6(13).png" align="middle" width="400px"/>
+      </td>
+      <td>
+        <img src="./img/part6(14).png" align="middle" width="400px"/>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <img src="./img/part6(15).png" align="middle" width="400px"/>
+      </td>
+      <td>
+        <img src="./img/part6(16).png" align="middle" width="400px"/>
+      </td>
+    </tr>
+  </table>
+</div>
+<p>
+  This effect of rounding out edges can be decreased by pre-splitting edges. For example: 
+</p>
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="./img/61.png" align="middle" width="400px"/>
+        <figcaption align="middle">Original mesh</figcaption>
+      </td>
+      <td>
+        <img src="./img/62.png" align="middle" width="400px"/>
+        <figcaption align="middle">Pre-split edges</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr>
+      <td>
+        <img src="./img/63.png" align="middle" width="400px"/>
+        <figcaption align="middle">Upsample</figcaption>
+      </td>
+      <td>
+        <img src="./img/64.png" align="middle" width="400px"/>
+        <figcaption align="middle">Upsample</figcaption>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <img src="./img/65.png" align="middle" width="400px"/>
+        <figcaption align="middle">Result of pre-splitting edges</figcaption>
+      </td>
+      <td>
+        <img src="./img/part6(16).png" align="middle" width="400px"/>
+        <figcaption align="middle">Result of not pre-splitting edges</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+<p>
+  We can preprocess the cube so that it subdivides symmetrically by adding an extra edge split on each face like so: 
+</p>
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="./img/test6(1).png" align="middle" width="400px"/>
+        <figcaption align="middle">Cube with extra edge splits</figcaption>
+      </td>
+      <td>
+        <img src="./img/test6(2).png" align="middle" width="400px"/>
+        <figcaption align="middle">After upsampling</figcaption>
+      </td>
+    </tr>
+</div>
+<div align="middle">
+  <table style="width=100%">
+    <tr>
+      <td>
+        <img src="./img/part4(1).png" align="middle" width="400px"/>
+        <figcaption align="middle">Original mesh</figcaption>
+      </td>
+      <td>
+        <img src="./img/part6(1).png" align="middle" width="400px"/>
+        <figcaption align="middle">Split all edges going across each face</figcaption>
+      </td>
+    </tr>
+  <p>
+    We can also preprocess the cube to subdivide symmetrically by adding edge splits and flips as demonstrated below: 
+  </p>
+    <br>
+    <tr>
+      <td>
+        <img src="./img/part6(2).png" align="middle" width="400px"/>
+        <figcaption align="middle">Flipped every bordering edge</figcaption>
+      </td>
+      <td>
+        <img src="./img/part6(3).png" align="middle" width="400px"/>
+        <figcaption align="middle">Upsampled</figcaption>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <img src="./img/part6(4).png" align="middle" width="400px"/>
+        <figcaption align="middle">More upsampling</figcaption>
+      </td>
+      <td>
+        <img src="./img/part6(5).png" align="middle" width="400px"/>
+        <figcaption align="middle">Some more upsampling</figcaption>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <img src="./img/part6(6).png" align="middle" width="400px"/>
+        <figcaption align="middle">Even more upsampling</figcaption>
+      </td>
+      <td>
+        <img src="./img/part6(7).png" align="middle" width="400px"/>
+        <figcaption align="middle">A lot of upsampling</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+</body>
+</html>
